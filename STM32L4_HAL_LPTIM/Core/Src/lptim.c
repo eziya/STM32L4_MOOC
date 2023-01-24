@@ -41,7 +41,7 @@ void MX_LPTIM2_Init(void)
   hlptim2.Init.Clock.Source = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
   hlptim2.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV1;
   hlptim2.Init.Trigger.Source = LPTIM_TRIGSOURCE_0;
-  hlptim2.Init.Trigger.ActiveEdge = LPTIM_ACTIVEEDGE_FALLING;
+  hlptim2.Init.Trigger.ActiveEdge = LPTIM_ACTIVEEDGE_RISING;
   hlptim2.Init.Trigger.SampleTime = LPTIM_TRIGSAMPLETIME_DIRECTTRANSITION;
   hlptim2.Init.OutputPolarity = LPTIM_OUTPUTPOLARITY_HIGH;
   hlptim2.Init.UpdateMode = LPTIM_UPDATE_IMMEDIATE;
@@ -85,12 +85,12 @@ void HAL_LPTIM_MspInit(LPTIM_HandleTypeDef* lptimHandle)
     /**LPTIM2 GPIO Configuration
     PA5     ------> LPTIM2_ETR
     */
-    GPIO_InitStruct.Pin = BTN_DOWN_Pin;
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF14_LPTIM2;
-    HAL_GPIO_Init(BTN_DOWN_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     /* LPTIM2 interrupt Init */
     HAL_NVIC_SetPriority(LPTIM2_IRQn, 0, 0);
@@ -115,7 +115,7 @@ void HAL_LPTIM_MspDeInit(LPTIM_HandleTypeDef* lptimHandle)
     /**LPTIM2 GPIO Configuration
     PA5     ------> LPTIM2_ETR
     */
-    HAL_GPIO_DeInit(BTN_DOWN_GPIO_Port, BTN_DOWN_Pin);
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_5);
 
     /* LPTIM2 interrupt Deinit */
     HAL_NVIC_DisableIRQ(LPTIM2_IRQn);

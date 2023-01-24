@@ -93,11 +93,21 @@ int main(void)
   MX_LPTIM2_Init();
   /* USER CODE BEGIN 2 */
 
+  // connect PA5 and PA0, PA0 button will trigger PA5 timer external trigger
+  // LPTIM2 timer source is 32768Hz
+  // configure timeout as 1sec
+  // timeout interrupt will wake up the system
   uint32_t period = 65535;
   uint32_t timeout = 32767;
   HAL_LPTIM_TimeOut_Start_IT(&hlptim2, period, timeout);
 
-  //HAL_PWREx_EnterSTOP1Mode(PWR_STOPENTRY_WFI);
+  // waiting at stop mode
+  HAL_SuspendTick();
+  HAL_PWREx_EnterSTOP1Mode(PWR_STOPENTRY_WFI);
+
+  // recover systick & system clock
+  HAL_ResumeTick();
+  SystemClock_Config();
 
   /* USER CODE END 2 */
 
@@ -108,6 +118,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
+    HAL_Delay(100);
   }
   /* USER CODE END 3 */
 }
