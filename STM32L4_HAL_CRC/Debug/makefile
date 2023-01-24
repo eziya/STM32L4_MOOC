@@ -60,8 +60,8 @@ all: main-build
 main-build: STM32L4_HAL_CRC.elf secondary-outputs
 
 # Tool invocations
-STM32L4_HAL_CRC.elf STM32L4_HAL_CRC.map: $(OBJS) $(USER_OBJS) E:\Workspace\STM32\STM32L4_HAL_EXAMPLES\STM32L4_HAL_CRC\STM32L476VGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "STM32L4_HAL_CRC.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"E:\Workspace\STM32\STM32L4_HAL_EXAMPLES\STM32L4_HAL_CRC\STM32L476VGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM32L4_HAL_CRC.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+STM32L4_HAL_CRC.elf STM32L4_HAL_CRC.map: $(OBJS) $(USER_OBJS) E:\WorkSpace\STM32\STM32L4_MOOC\STM32L4_HAL_CRC\STM32L476VGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "STM32L4_HAL_CRC.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"E:\WorkSpace\STM32\STM32L4_MOOC\STM32L4_HAL_CRC\STM32L476VGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM32L4_HAL_CRC.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
