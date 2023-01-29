@@ -53,19 +53,20 @@ FATFS fatFS;
 osThreadId appTaskHandle;
 osThreadId usbTaskHandle;
 osMutexId qspiMutexHandle;
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 
 /* USER CODE END FunctionPrototypes */
 
-void appTaskBody(void const *argument);
-void usbTaskBody(void const *argument);
+void appTaskBody(void const * argument);
+void usbTaskBody(void const * argument);
 
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
-void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize);
+void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
 
 /* USER CODE BEGIN GET_IDLE_TASK_MEMORY */
 static StaticTask_t xIdleTaskTCBBuffer;
@@ -81,12 +82,11 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackTyp
 /* USER CODE END GET_IDLE_TASK_MEMORY */
 
 /**
- * @brief  FreeRTOS initialization
- * @param  None
- * @retval None
- */
-void MX_FREERTOS_Init(void)
-{
+  * @brief  FreeRTOS initialization
+  * @param  None
+  * @retval None
+  */
+void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -133,7 +133,7 @@ void MX_FREERTOS_Init(void)
  * @retval None
  */
 /* USER CODE END Header_appTaskBody */
-void appTaskBody(void const *argument)
+void appTaskBody(void const * argument)
 {
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
@@ -145,8 +145,8 @@ void appTaskBody(void const *argument)
   // mount file system
   if(f_mount(&fatFS, (TCHAR const*) USERPath, 1) != FR_OK)
   {
-    uint8_t buffer[_MAX_SS];
-    if(f_mkfs((TCHAR const*)USERPath, FM_ANY, 0, buffer, sizeof(buffer)) != FR_OK)
+    uint8_t work[_MIN_SS];
+    if(f_mkfs((TCHAR const*)USERPath, FM_ANY, 0, work, sizeof(work)) != FR_OK)
     {
       Error_Handler();
     }
@@ -166,6 +166,8 @@ void appTaskBody(void const *argument)
     f_close(&file);
   }
 
+  f_mount(NULL, "", 0);
+
   // release mutex
   osMutexRelease(qspiMutexHandle);
 
@@ -181,6 +183,7 @@ void appTaskBody(void const *argument)
     osMutexWait(qspiMutexHandle, osWaitForever);
 
     // add your code here
+    osDelay(100);
 
     // release mutex
     osMutexRelease(qspiMutexHandle);
@@ -198,7 +201,7 @@ void appTaskBody(void const *argument)
  * @retval None
  */
 /* USER CODE END Header_usbTaskBody */
-void usbTaskBody(void const *argument)
+void usbTaskBody(void const * argument)
 {
   /* USER CODE BEGIN usbTaskBody */
   uint32_t USB_VBUS_counter = 0;
