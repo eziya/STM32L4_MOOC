@@ -136,7 +136,7 @@ void MX_FREERTOS_Init(void) {
 void appTaskBody(void const * argument)
 {
   /* init code for USB_DEVICE */
-  MX_USB_DEVICE_Init();
+  //MX_USB_DEVICE_Init();
   /* USER CODE BEGIN appTaskBody */
 
   // get mutex first before access flash memory
