@@ -57,6 +57,10 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define A 0x1
+#define B 0x2
+#define AUDIO_RESET_Pin GPIO_PIN_3
+#define AUDIO_RESET_GPIO_Port GPIOE
 #define LED_RED_Pin GPIO_PIN_2
 #define LED_RED_GPIO_Port GPIOB
 #define LED_GREEN_Pin GPIO_PIN_8
