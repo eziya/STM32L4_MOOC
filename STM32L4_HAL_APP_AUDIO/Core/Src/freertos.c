@@ -296,11 +296,11 @@ void audioTaskBody(void const *argument)
       switch(event.value.v)
       {
       case B:
-        // half tx complete
+        // full tx complete
         bufferOffset = AUDIO_BUFFER_SIZE / 2;
         break;
       case A:
-        // full tx complete
+        // half tx complete
         bufferOffset = 0;
         break;
       default:
