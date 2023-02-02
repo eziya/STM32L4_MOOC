@@ -40,7 +40,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+typedef enum {
+  AUDIOPLAYER_STATE_STOPPED = 0,
+  AUDIOPLAYER_STATE_RUNNING,
+  AUDIOPLAYER_STATE_PAUSED
+} AudioPlayer_StateTypeDef;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,27 +58,33 @@ FIL file;
 FATFS fatFS;
 uint8_t audioBuffer[AUDIO_BUFFER_SIZE];
 uint32_t actualPosition;
+AudioPlayer_StateTypeDef  AppState = AUDIOPLAYER_STATE_STOPPED;
 
 /* USER CODE END Variables */
 osThreadId appTaskHandle;
 osThreadId usbTaskHandle;
 osThreadId audioTaskHandle;
+osMessageQId joystickInputQueueHandle;
 osMutexId qspiMutexHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-static void audioPlayerStart();
+static void audioPlayerStart(void);
+static void audioPlayerStop(void);
+static void audioPlayerPause(void);
+static void audioPlayerResume(void);
+static void handleJoystickEvent(osEvent event);
 /* USER CODE END FunctionPrototypes */
 
-void appTaskBody(void const *argument);
-void usbTaskBody(void const *argument);
-void audioTaskBody(void const *argument);
+void appTaskBody(void const * argument);
+void usbTaskBody(void const * argument);
+void audioTaskBody(void const * argument);
 
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
-void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize);
+void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
 
 /* USER CODE BEGIN GET_IDLE_TASK_MEMORY */
 static StaticTask_t xIdleTaskTCBBuffer;
@@ -94,8 +104,7 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackTyp
  * @param  None
  * @retval None
  */
-void MX_FREERTOS_Init(void)
-{
+void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -115,6 +124,11 @@ void MX_FREERTOS_Init(void)
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
+
+  /* Create the queue(s) */
+  /* definition and creation of joystickInputQueue */
+  osMessageQDef(joystickInputQueue, 1, uint16_t);
+  joystickInputQueueHandle = osMessageCreate(osMessageQ(joystickInputQueue), NULL);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -146,7 +160,7 @@ void MX_FREERTOS_Init(void)
  * @retval None
  */
 /* USER CODE END Header_appTaskBody */
-void appTaskBody(void const *argument)
+void appTaskBody(void const * argument)
 {
   /* init code for USB_DEVICE */
   //MX_USB_DEVICE_Init();
@@ -194,13 +208,15 @@ void appTaskBody(void const *argument)
     Error_Handler();
   }
 
-  // play audio
-  audioPlayerStart();
-
   /* Infinite loop */
   for(;;)
   {
-    osDelay(100);
+    osEvent event = osMessageGet(joystickInputQueueHandle, osWaitForever);
+
+    if(event.status == osEventMessage)
+    {
+      handleJoystickEvent(event);
+    }
   }
   /* USER CODE END appTaskBody */
 }
@@ -212,7 +228,7 @@ void appTaskBody(void const *argument)
  * @retval None
  */
 /* USER CODE END Header_usbTaskBody */
-void usbTaskBody(void const *argument)
+void usbTaskBody(void const * argument)
 {
   /* USER CODE BEGIN usbTaskBody */
   uint32_t USB_VBUS_counter = 0;
@@ -225,7 +241,7 @@ void usbTaskBody(void const *argument)
     while(USB_VBUS_counter < 5)
     {
       osDelay(10);
-      //check VBUS HIGH 5 times
+      // check VBUS HIGH 5 times
       if(HAL_GPIO_ReadPin(USB_VBUS_GPIO_Port, USB_VBUS_Pin) != GPIO_PIN_RESET)
       {
         USB_VBUS_counter++;
@@ -239,7 +255,17 @@ void usbTaskBody(void const *argument)
     // if VBUS is HIGH, initialize USB Device
     if(USB_VBUS_counter >= 5)
     {
+      // stop audio
+      audioPlayerStop();
+
+      // get mutex
+      osMutexWait(qspiMutexHandle, osWaitForever);
+
+      // initialize USB
       MX_USB_DEVICE_Init();
+
+      // release mutex
+      osMutexRelease(qspiMutexHandle);
 
       // Red led on
       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
@@ -260,7 +286,14 @@ void usbTaskBody(void const *argument)
         }
       }
 
+      // get mutex
+      osMutexWait(qspiMutexHandle, osWaitForever);
+
+      // de-initialize USB
       USBD_DeInit(&hUsbDeviceFS);
+
+      // release mutex
+      osMutexRelease(qspiMutexHandle);
 
       // Red led off
       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
@@ -278,12 +311,15 @@ void usbTaskBody(void const *argument)
  * @retval None
  */
 /* USER CODE END Header_audioTaskBody */
-void audioTaskBody(void const *argument)
+void audioTaskBody(void const * argument)
 {
   /* USER CODE BEGIN audioTaskBody */
   uint32_t bufferOffset = 0;
   uint32_t bytesRead = 0;
   osEvent event;
+
+  /* pause at first */
+  osThreadSuspend(audioTaskHandle);
 
   /* Infinite loop */
   for(;;)
@@ -341,38 +377,102 @@ void audioTaskBody(void const *argument)
       HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
     }
   }
+  /* USER CODE END audioTaskBody */
 }
-/* USER CODE END audioTaskBody */
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 /**
-  * @brief Tx Transfer completed callbacks.
-  * @param  hsai : pointer to a SAI_HandleTypeDef structure that contains
-  *                the configuration information for SAI module.
-  * @retval None
-  */
+ * @brief Tx Transfer completed callbacks.
+ * @param  hsai : pointer to a SAI_HandleTypeDef structure that contains
+ *                the configuration information for SAI module.
+ * @retval None
+ */
 void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai)
 {
   osSignalSet(audioTaskHandle, B);
 }
 
 /**
-  * @brief Tx Transfer Half completed callbacks
-  * @param  hsai : pointer to a SAI_HandleTypeDef structure that contains
-  *                the configuration information for SAI module.
-  * @retval None
-  */
+ * @brief Tx Transfer Half completed callbacks
+ * @param  hsai : pointer to a SAI_HandleTypeDef structure that contains
+ *                the configuration information for SAI module.
+ * @retval None
+ */
 void HAL_SAI_TxHalfCpltCallback(SAI_HandleTypeDef *hsai)
 {
   osSignalSet(audioTaskHandle, A);
 }
 
 /**
-  * @brief AudioPlayer Start method
-  * @param  None
-  * @retval None
-  */
+ * @brief  EXTI line detection callback.
+ * @param  GPIO_Pin Specifies the port pin connected to corresponding EXTI line.
+ * @retval None
+ */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  switch (GPIO_Pin)
+  {
+  case JOY_CENTER_Pin:
+    osMessagePut(joystickInputQueueHandle, JOY_CENTER_Pin, 0);
+    break;
+  case JOY_LEFT_Pin:
+    osMessagePut(joystickInputQueueHandle, JOY_LEFT_Pin, 0);
+    break;
+  case JOY_RIGHT_Pin:
+    osMessagePut(joystickInputQueueHandle, JOY_RIGHT_Pin, 0);
+    break;
+  case JOY_UP_Pin:
+    osMessagePut(joystickInputQueueHandle, JOY_UP_Pin, 0);
+    break;
+  case JOY_DOWN_Pin:
+    osMessagePut(joystickInputQueueHandle, JOY_DOWN_Pin, 0);
+    break;
+  default:
+    Error_Handler();
+    break;
+  }
+}
+
+// Joystick input handler
+static void handleJoystickEvent(osEvent event)
+{
+  if (event.status != osEventMessage) return;
+
+  switch(AppState)
+  {
+  case AUDIOPLAYER_STATE_STOPPED:
+    if(event.value.v == JOY_RIGHT_Pin)
+    {
+      audioPlayerStart();
+    }
+    break;
+  case AUDIOPLAYER_STATE_RUNNING:
+    if(event.value.v == JOY_CENTER_Pin)
+    {
+      audioPlayerPause();
+    }
+    else if(event.value.v == JOY_LEFT_Pin)
+    {
+      audioPlayerStop();
+    }
+    break;
+  case AUDIOPLAYER_STATE_PAUSED:
+    if(event.value.v == JOY_RIGHT_Pin)
+    {
+      audioPlayerResume();
+    }
+    else if(event.value.v == JOY_LEFT_Pin)
+    {
+      audioPlayerStop();
+    }
+    break;
+  default:
+    break;
+  }
+}
+
+/* audio functions */
 static void audioPlayerStart(void)
 {
   /* Wake-Up external audio Codec and enable output */
@@ -407,5 +507,94 @@ static void audioPlayerStart(void)
   {
     Error_Handler();
   }
+
+  /* update state */
+  AppState = AUDIOPLAYER_STATE_RUNNING;
+
+  /* resume task */
+  osThreadResume(audioTaskHandle);
+
 }
+
+static void audioPlayerStop(void)
+{
+  /* Stop the playback */
+  if (AUDIO_Stop(AUDIO_I2C_ADDRESS, CODEC_PDWN_SW) != 0)
+  {
+    Error_Handler();
+  }
+  /* Stop DMA transfer */
+  if (HAL_SAI_DMAStop(&hsai_BlockA1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Wait for the qspiMutex */
+  osMutexWait(qspiMutexHandle, osWaitForever);
+
+  /* Pause the audioTask */
+  osThreadSuspend(audioTaskHandle);
+
+  /* Close the Audio file */
+  if(f_close(&file) != FR_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Release the qspiMutex */
+  osMutexRelease(qspiMutexHandle);
+
+  /* Turn OFF the PLAY signaling LED */
+  HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+
+  AppState = AUDIOPLAYER_STATE_STOPPED;
+}
+
+static void audioPlayerPause(void)
+{
+  /* Stop the playback */
+  if (AUDIO_Pause(AUDIO_I2C_ADDRESS) != 0)
+  {
+    Error_Handler();
+  }
+  /* Stop DMA transfer */
+  if (HAL_SAI_DMAPause(&hsai_BlockA1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Wait for the qspiMutex */
+  osMutexWait(qspiMutexHandle, osWaitForever);
+
+  /* Pause the audioTask */
+  osThreadSuspend(audioTaskHandle);
+
+  /* Release the qspiMutex */
+  osMutexRelease(qspiMutexHandle);
+
+  /* Turn OFF the PLAY signaling LED */
+  HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+
+  AppState = AUDIOPLAYER_STATE_PAUSED;
+}
+
+static void audioPlayerResume(void)
+{
+  /* Resume DMA transfer */
+  if (HAL_SAI_DMAResume(&hsai_BlockA1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* Resume the playback */
+  if (AUDIO_Resume(AUDIO_I2C_ADDRESS) != 0)
+  {
+    Error_Handler();
+  }
+
+  AppState = AUDIOPLAYER_STATE_RUNNING;
+
+  /* Resume audioTask */
+  osThreadResume(audioTaskHandle);
+}
+
 /* USER CODE END Application */
