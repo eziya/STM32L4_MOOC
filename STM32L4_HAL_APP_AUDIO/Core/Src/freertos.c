@@ -258,14 +258,11 @@ void usbTaskBody(void const * argument)
       // stop audio
       audioPlayerStop();
 
-      // get mutex
+      // get mutex and shouldn't release until USB is disconnected
       osMutexWait(qspiMutexHandle, osWaitForever);
 
       // initialize USB
       MX_USB_DEVICE_Init();
-
-      // release mutex
-      osMutexRelease(qspiMutexHandle);
 
       // Red led on
       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
@@ -285,9 +282,6 @@ void usbTaskBody(void const * argument)
           USB_VBUS_counter = 5;
         }
       }
-
-      // get mutex
-      osMutexWait(qspiMutexHandle, osWaitForever);
 
       // de-initialize USB
       USBD_DeInit(&hUsbDeviceFS);
