@@ -22,9 +22,9 @@
 #include "dma.h"
 #include "fatfs.h"
 #include "i2c.h"
+#include "lcd.h"
 #include "quadspi.h"
 #include "sai.h"
-#include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -101,6 +101,7 @@ int main(void)
   MX_FATFS_Init();
   MX_I2C1_Init();
   MX_SAI1_Init();
+  MX_LCD_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */

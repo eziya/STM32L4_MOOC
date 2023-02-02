@@ -30,6 +30,7 @@
 #include "fatfs.h"
 #include "sai.h"
 #include "cs43l22.h"
+#include "lcd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -64,6 +65,7 @@ AudioPlayer_StateTypeDef  AppState = AUDIOPLAYER_STATE_STOPPED;
 osThreadId appTaskHandle;
 osThreadId usbTaskHandle;
 osThreadId audioTaskHandle;
+osThreadId displayTaskHandle;
 osMessageQId joystickInputQueueHandle;
 osMutexId qspiMutexHandle;
 
@@ -79,8 +81,8 @@ static void handleJoystickEvent(osEvent event);
 void appTaskBody(void const * argument);
 void usbTaskBody(void const * argument);
 void audioTaskBody(void const * argument);
+void displayTaskBody(void const * argument);
 
-extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
@@ -100,10 +102,10 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackTyp
 /* USER CODE END GET_IDLE_TASK_MEMORY */
 
 /**
- * @brief  FreeRTOS initialization
- * @param  None
- * @retval None
- */
+  * @brief  FreeRTOS initialization
+  * @param  None
+  * @retval None
+  */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 
@@ -147,6 +149,10 @@ void MX_FREERTOS_Init(void) {
   osThreadDef(audioTask, audioTaskBody, osPriorityNormal, 0, 1024);
   audioTaskHandle = osThreadCreate(osThread(audioTask), NULL);
 
+  /* definition and creation of displayTask */
+  osThreadDef(displayTask, displayTaskBody, osPriorityNormal, 0, 128);
+  displayTaskHandle = osThreadCreate(osThread(displayTask), NULL);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -162,8 +168,6 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_appTaskBody */
 void appTaskBody(void const * argument)
 {
-  /* init code for USB_DEVICE */
-  //MX_USB_DEVICE_Init();
   /* USER CODE BEGIN appTaskBody */
 
   // get mutex first before access flash memory
@@ -372,6 +376,52 @@ void audioTaskBody(void const * argument)
     }
   }
   /* USER CODE END audioTaskBody */
+}
+
+/* USER CODE BEGIN Header_displayTaskBody */
+/**
+ * @brief Function implementing the displayTask thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_displayTaskBody */
+void displayTaskBody(void const * argument)
+{
+  /* USER CODE BEGIN displayTaskBody */
+  uint32_t prevAppState = -1;
+
+  /* Infinite loop */
+  for(;;)
+  {
+    if (prevAppState != AppState)
+    {
+      switch(AppState)
+      {
+      case AUDIOPLAYER_STATE_STOPPED:
+        LCD_GLASS_Clear();
+        LCD_GLASS_DisplayString((uint8_t*)"*STOP*");
+        break;
+      case AUDIOPLAYER_STATE_RUNNING:
+        LCD_GLASS_Clear();
+        LCD_GLASS_DisplayString((uint8_t*)"*PLAY*");
+        break;
+      case AUDIOPLAYER_STATE_PAUSED:
+        LCD_GLASS_Clear();
+        LCD_GLASS_DisplayString((uint8_t*)"PAUSED");
+        break;
+      default:
+        Error_Handler();
+        break;
+      }
+    }
+    else {
+      /* Add some animations or display content changes depending on the App State */
+    }
+
+    prevAppState = AppState;
+    osDelay(100);
+  }
+  /* USER CODE END displayTaskBody */
 }
 
 /* Private application code --------------------------------------------------*/
